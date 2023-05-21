@@ -87,9 +87,9 @@ if __name__ == '__main__':
     if uploaded_file is not None:
         # Displaying the image
         st.subheader("Uploaded Image")
-        pilImg = Image.open(uploaded_file)
-        st.image(pilImg, caption='Uploaded Image', use_column_width=True)
-        pilImg.save("img." + pilImg.format)
+        img = Image.open(uploaded_file).convert('RGB')
+        st.image(img, caption='Uploaded Image', use_column_width=True)
+        # pilImg.save("img." + pilImg.format)
 
         # Give the user an on-screen indication that we are working
         onscreen = st.empty()
@@ -100,7 +100,6 @@ if __name__ == '__main__':
         print(f"\n ==> Running {task} with weights {weights}\n ")
         with torch.no_grad():
             # Load image in cpu
-            img = Image.open(uploaded_file).convert('RGB')
             img = np.array(img)
             input_ = torch.from_numpy(img).float().div(255.).permute(2, 0, 1).unsqueeze(0).cpu()
 
