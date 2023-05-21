@@ -1,0 +1,17 @@
+.ipynb_checkpoints/
+*.pyc
+*.png
+*.tif
+*.jpg
+*.pth
+*.mat
+*.npy
+.DS_Store
+
+/Motion_Deblurring/Datasets/Downloads/
+/Motion_Deblurring/Datasets/test/
+/Motion_Deblurring/Datasets/train/
+/Motion_Deblurring/Datasets/val/
+/requirements_3.txt
+/requirements_2.txt
+/.eggs/
