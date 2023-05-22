@@ -21,6 +21,84 @@ import numpy as np
 
 
 device = 'cpu'
+import torch
+import os
+import torch.nn.functional as F
+import streamlit as st
+from runpy import run_path
+from PIL import Image, ImageFilter
+from skimage.util import img_as_ubyte
+from io import BytesIO
+import numpy as np
+
+
+def decrease_resolution(image, max_width, max_height):
+    # Get the original width and height of the image
+    width, height = image.size
+
+    # Calculate the aspect ratio of the image
+    aspect_ratio = width / height
+    new_width = width
+    new_height = height
+
+    # Calculate the new width and height while maintaining the aspect ratio
+    if width > max_width:
+        new_width = max_width
+        new_height = int(new_width / aspect_ratio)
+    if height > max_height:
+        new_height = max_height
+        new_width = int(new_height * aspect_ratio)
+
+    # Resize the image while maintaining the aspect ratio
+    resized_image = image.resize((new_width, new_height), Image.ANTIALIAS)
+
+    return resized_image
+
+
+def increase_resolution(image, target_width, target_height):
+    # Get the original width and height of the image
+    width, height = image.size
+
+    # Calculate the aspect ratio of the image
+    aspect_ratio = width / height
+
+    # Calculate the new width and height while maintaining the aspect ratio
+    if width < target_width:
+        new_width = target_width
+        new_height = int(new_width / aspect_ratio)
+    elif height < target_height:
+        new_height = target_height
+        new_width = int(new_height * aspect_ratio)
+    else:
+        # No need to resize if the image is already larger than the specified dimensions
+        return image
+
+    # Resize the image while maintaining the aspect ratio
+    resized_image = image.resize((new_width, new_height), Image.ANTIALIAS)
+
+    return resized_image
+
+    # Create a new image with the target dimensions and paste the resized image onto it
+    # final_image = Image.new("RGB", (target_width, target_height))
+    # final_image.paste(resized_image, ((target_width - new_width) // 2, (target_height - new_height) // 2))
+    #
+    # return final_image
+
+#
+# def rotation(image, width, height, prior=True):
+#     if prior:
+#         rotationbool = False
+#         if height > width:
+#             rotationbool = True
+#             angle = 90
+#             image = image.rotate(angle, expand=True)
+#         return image, rotationbool
+#     else:
+#         angle = -90
+#         image = image.rotate(angle, expand=True)
+#         return image, True
+#
+
 # Loading the model Once for Optimization
 @st.cache_resource
 def loadModel():
@@ -30,27 +108,16 @@ def loadModel():
                   'heads': [1, 2, 4, 8], 'ffn_expansion_factor': 2.66, 'bias': False, 'LayerNorm_type': 'WithBias',
                   'dual_pixel_task': False}
     weights = os.path.join('Motion_Deblurring', 'pretrained_models', 'motion_deblurring.pth')
-    # Load Model Arch and convert load to CPU
+    # Load Model Arch and convert to CPU
     load_arch = run_path(os.path.join('basicsr', 'models', 'archs', 'restormer_arch.py'))
     model = load_arch['Restormer'](**parameters)
     model.cpu()
     # Load weights&Params to Model
-    checkpoint = torch.load(weights, map_location=device)
+    checkpoint = torch.load(weights)
     model.load_state_dict(checkpoint['params'])
     print("************** Model Loaded **************")
     return model, weights
 
-# @st.cache_data
-# def downloadPretrainedModel():
-#     url = 'https://doc-0o-28-docs.googleusercontent.com/docs/securesc/m802rataeslhirhfie0pfrjj12givbsk' \
-#           '/dmulq66f26t2cv1eu619i8tljhqvseh8/1684627200000/02491329711803024297/02800346804463572545' \
-#           '/1pwcOhDS5Erzk8yfAbu7pXTud606SB4-L?e=download&ax' \
-#           '=ADWCPKCkW87WIeEy9QcLVoqoue5xcfxVSRFDYvzzuhW0xUZFKZbFUsaFPfGN_swQC8pymxeAHew3nFD0unHCJc1YpELwrh' \
-#           '-79yrhhrsTlAbnJ9KUxAOlI_PO2IY99hbOdEEh0_mnwrY6IGzjtzsPhjcw' \
-#           '-7GmMSRC24rrBBEZVzGQsuTxX8wvFsqfr0Z1SM3IEiYgFkb8CwhoxGY9bOWDGCDJwZVHxlZWENcNG2xw5mDZCuKaau8zw28' \
-#           '-Z71I8Dqo96P1Tv4GXiJtv2u0WyU0bKbWiA_UR78iybM5YiJurv9NzN0Zev1yGVqhZglaaKCOnwXtVM1uLMQ_M2Dyh7evMzLBrMVWAb05cpE3mDcTyI6PGunO6n6IAL9P3pFAamkKndNdOL84nOZ8Bm1W2aua5t4YdXb-7X4RDD3g6eD48XfPlPZaJYMx0wwfmuxsf-MGJwR6Ov01riZkldirgfD9joyTlz5sRF3f7q-PoaHgrMxxAYwMFrTf_aZxCsXr3vz4281gbllOX6d1bvDK86WND9VJfTCxPJz4g5CiciiMxF7oicHMItYpPHVwRHvLlwaZcZ18weJYloNBkZLpZKEf5My9phPoI2sF3uPls9ivDVCniWE5beGEE0f4yKeffIa-Z7_gDounNJE1qaVB_gZlM_KP00fceNe57U9QeI1AyCXexxl0arQj_Hmr8P2RoJUxrLnNXEN9xfKfyGFCFMluQiMM9FYZq8tTBLyicsXz_XIEGULFGxuNaraHJwPGdju7qCq27brM7jz3GxzsAQ-An4Du6AbKap3kDToHCtSqvunnmTE4gy1iyQ52HLg-M79gJX_Xq4flbcxUdUwIsJ_PnxhE2jglffy3qyvgMixcfJg8NfHVmTIuSuRWYzcpuF_76PXn7TC54JEM8LgFKFQ_TsK4w6XCiEbXqmd5GbM1mgG3T6wYYFgRHsCe587cnSDqf83ExBnO1TA&uuid=ddf06112-c37f-412e-a1f6-5abfa5d812dd&authuser=0&nonce=p7odnlsqijn7i&user=02800346804463572545&hash=02u1jprk8v5ahii6jmoqrg95mff6f4bn'
-#     output = "motion_deblurring.pth"
-#     gdown.download(url, output, quiet=False)
 
 # Gets the download Link
 def downloadImgBtn(img):
@@ -71,9 +138,6 @@ if __name__ == '__main__':
     # Task
     task = 'Motion_Deblurring'
 
-    # # Download weights from drive
-    # downloadPretrainedModel()
-
     # Model
     model, weights = loadModel()
 
@@ -84,12 +148,23 @@ if __name__ == '__main__':
     st.subheader("Image Uploader:")
     extensions = ['jpg', 'JPG', 'png', 'PNG', 'jpeg', 'JPEG', 'bmp', 'BMP']
     uploaded_file = st.file_uploader("Choose an image...", type=extensions)
+
     if uploaded_file is not None:
         # Displaying the image
         st.subheader("Uploaded Image")
-        img = Image.open(uploaded_file).convert('RGB')
-        st.image(img, caption='Uploaded Image', use_column_width=True)
-        # pilImg.save("img." + pilImg.format)
+        pilImg = Image.open(uploaded_file).convert('RGB')
+
+        # Pre Processing
+        target_width, target_height = pilImg.size
+        max_width = 300
+        max_height = 300
+        pilImg = decrease_resolution(pilImg, max_width, max_height)
+
+        # Displaying Image
+        st.image(pilImg, caption='Uploaded Image', use_column_width=True)
+
+        # # Rotation
+        # pilImg, rot = rotation(pilImg, target_width, target_height, prior=True)
 
         # Give the user an on-screen indication that we are working
         onscreen = st.empty()
@@ -99,12 +174,15 @@ if __name__ == '__main__':
         img_multiple_of = 8
         print(f"\n ==> Running {task} with weights {weights}\n ")
         with torch.no_grad():
-            # Load image in cpu
-            img = np.array(img)
+            # Empty cuda cache
+            # torch.cuda.ipc_collect()
+            # torch.cuda.empty_cache()
+
+            # load into cuda
+            img = np.array(pilImg)
             input_ = torch.from_numpy(img).float().div(255.).permute(2, 0, 1).unsqueeze(0).cpu()
 
-            # Pre-Processing
-            # Pad the input if not_multiple_of 8
+            # Pre inference processing Pad the input if not_multiple_of 8
             h, w = input_.shape[2], input_.shape[3]
             H, W = ((h + img_multiple_of) // img_multiple_of) * img_multiple_of, (
                     (w + img_multiple_of) // img_multiple_of) * img_multiple_of
@@ -112,24 +190,29 @@ if __name__ == '__main__':
             padw = W - w if w % img_multiple_of != 0 else 0
             input_ = F.pad(input_, (0, padw, 0, padh), 'reflect')
 
-            # Infere image
+            # Inference
             restored = model(input_)
             restored = torch.clamp(restored, 0, 1)
 
-            # Post Processing
             # Unpad the output
             restored = restored[:, :, :h, :w]
             restored = restored.permute(0, 2, 3, 1).cpu().detach().numpy()
             restored = img_as_ubyte(restored[0])
 
-            # Image Sharpening
+            # # Image Sharpening
             sharpen_filter = [
                 0, -1, 0,
                 -1, 5, -1,
                 0, -1, 0
             ]
+            # Original Resolution
             im = Image.fromarray(restored.astype('uint8'), 'RGB')
+            im = increase_resolution(im, target_width, target_height)
+            # if rot:
+            #     im = rotation(im, target_width, target_width, False)
+            # Create a kernel filter using the defined matrix
             kernel_filter = ImageFilter.Kernel((3, 3), sharpen_filter)
+            # Apply the kernel filter to the image
             restored = im.filter(kernel_filter)
 
             # Show the user that we have finished
